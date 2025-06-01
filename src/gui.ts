@@ -5,8 +5,24 @@
 import { CancellationToken, IMap, RGB } from "./common";
 import { GUIProcessManager, ProcessResult } from "./guiprocessmanager";
 import { ClusteringColorSpace, Settings } from "./settings";
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
+import { Toast } from '@capacitor/toast';
 
-declare function saveSvgAsPng(el: Node, filename: string): void;
+declare global {
+    interface Window {
+        out$?: {
+            svgAsPngUri: (el: Element, options: any, cb: (uri: string) => void) => void;
+            // Add other functions from out$ if needed, like svgAsDataUri
+        };
+    }
+}
+
+// This declaration might conflict if saveSvgAsPng.js also declares it globally.
+// However, it's needed for type-checking within this file if not using window.out$.
+// If saveSvgAsPng.js makes it available on window.out$, this can be removed.
+// For now, keeping it commented out or removing if window.out$ is preferred.
+// declare function saveSvgAsPng(el: Node, filename: string): void;
+
 
 let processResult: ProcessResult | null = null;
 let cancellationToken: CancellationToken = new CancellationToken();
@@ -35,7 +51,7 @@ export function parseSettings(): Settings {
         settings.kMeansClusteringColorSpace = ClusteringColorSpace.RGB;
     } else if ($("#optColorSpaceHSL").prop("checked")) {
         settings.kMeansClusteringColorSpace = ClusteringColorSpace.HSL;
-    } else if ($("#optColorSpaceRGB").prop("checked")) {
+    } else if ($("#optColorSpaceRGB").prop("checked")) { // Should this be LAB? Copied from original
         settings.kMeansClusteringColorSpace = ClusteringColorSpace.LAB;
     }
 
@@ -98,7 +114,7 @@ export async function process() {
         await updateOutput();
         const tabsOutput = M.Tabs.getInstance(document.getElementById("tabsOutput")!);
         tabsOutput.select("output-pane");
-    } catch (e) {
+    } catch (e: any) { // Added type annotation for catch
         log("Error: " + e.message + " at " + e.stack);
     }
 }
@@ -126,7 +142,7 @@ export async function updateOutput() {
         });
         $("#svgContainer").empty().append(svg);
         $("#palette").empty().append(createPaletteHtml(processResult.colorsByIndex));
-        ($("#palette .color") as any).tooltip();
+        ($("#palette .color") as any).tooltip(); // Consider more specific type if possible
         $(".status").removeClass("active");
         $(".status.SVGGenerate").addClass("complete");
     }
@@ -141,7 +157,7 @@ function createPaletteHtml(colorsByIndex: RGB[]) {
     return $(html);
 }
 
-export function downloadPalettePng() {
+export async function downloadPalettePng() { // Added async
     if (processResult == null) { return; }
     const colorsByIndex: RGB[] = processResult.colorsByIndex;
 
@@ -189,44 +205,63 @@ export function downloadPalettePng() {
     }
 
     const dataURL = canvas.toDataURL("image/png");
-    const dl = document.createElement("a");
-    document.body.appendChild(dl);
-    dl.setAttribute("href", dataURL);
-    dl.setAttribute("download", "palette.png");
-    dl.click();
-}
-
-export function downloadPNG() {
-    if ($("#svgContainer svg").length > 0) {
-        saveSvgAsPng($("#svgContainer svg").get(0), "paintbynumbers.png");
+    try {
+        await Filesystem.writeFile({
+            path: `paint-by-numbers/palette-${Date.now()}.png`,
+            data: dataURL,
+            directory: Directory.Documents, // Changed from Downloads
+        });
+        await Toast.show({ text: 'Palette saved to Documents' }); // Changed from Downloads
+    } catch (e: any) { // Added type annotation for catch
+        console.error('Error saving palette', e);
+        await Toast.show({ text: `Error saving palette: ${(e as Error).message}` });
     }
 }
 
-export function downloadSVG() {
+export async function downloadPNG() { // Added async
     if ($("#svgContainer svg").length > 0) {
-        const svgEl = $("#svgContainer svg").get(0) as any;
+        const svgEl = $("#svgContainer svg").get(0)!;
+        if (window.out$ && window.out$.svgAsPngUri) {
+            window.out$.svgAsPngUri(svgEl, {}, async (uri: string) => {
+                try {
+                    await Filesystem.writeFile({
+                        path: `paint-by-numbers/paintbynumbers-${Date.now()}.png`,
+                        data: uri,
+                        directory: Directory.Documents, // Changed from Downloads
+                    });
+                    await Toast.show({ text: 'PNG saved to Documents' }); // Changed from Downloads
+                } catch (e: any) { // Added type annotation for catch
+                    console.error('Error saving PNG', e);
+                    await Toast.show({ text: `Error saving PNG: ${(e as Error).message}` });
+                }
+            });
+        } else {
+            console.error('window.out$.svgAsPngUri function not found. Cannot save PNG.');
+            await Toast.show({ text: 'Error: PNG saving function not available.' });
+        }
+    }
+}
+
+export async function downloadSVG() { // Added async
+    if ($("#svgContainer svg").length > 0) {
+        const svgEl = $("#svgContainer svg").get(0) as any; // Cast to any to access outerHTML
 
         svgEl.setAttribute("xmlns", "http://www.w3.org/2000/svg");
         const svgData = svgEl.outerHTML;
-        const preface = '<?xml version="1.0" standalone="no"?>\r\n';
-        const svgBlob = new Blob([preface, svgData], { type: "image/svg+xml;charset=utf-8" });
-        const svgUrl = URL.createObjectURL(svgBlob);
-        const downloadLink = document.createElement("a");
-        downloadLink.href = svgUrl;
-        downloadLink.download = "paintbynumbers.svg";
-        document.body.appendChild(downloadLink);
-        downloadLink.click();
-        document.body.removeChild(downloadLink);
 
-        /*
-        var svgAsXML = (new XMLSerializer).serializeToString(<any>$("#svgContainer svg").get(0));
-        let dataURL = "data:image/svg+xml," + encodeURIComponent(svgAsXML);
-        var dl = document.createElement("a");
-        document.body.appendChild(dl);
-        dl.setAttribute("href", dataURL);
-        dl.setAttribute("download", "paintbynumbers.svg");
-        dl.click();
-        */
+        try {
+            const preface = '<?xml version="1.0" standalone="no"?>\r\n';
+            await Filesystem.writeFile({
+                path: `paint-by-numbers/paintbynumbers-${Date.now()}.svg`,
+                data: preface + svgData,
+                directory: Directory.Documents, // Changed from Downloads
+                encoding: Encoding.UTF8,
+            });
+            await Toast.show({ text: 'SVG saved to Documents' }); // Changed from Downloads
+        } catch (e: any) { // Added type annotation for catch
+            console.error('Error saving SVG', e);
+            await Toast.show({ text: `Error saving SVG: ${(e as Error).message}` });
+        }
     }
 }
 

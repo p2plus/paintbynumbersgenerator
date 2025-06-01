@@ -1,6 +1,6 @@
 {
     "compilerOptions": {
-        "outFile": "../scripts/main.js",
+        "outFile": "../dist/scripts/main.js",
         "noImplicitAny": true,
         "strict": true,
         "noImplicitReturns": true,
