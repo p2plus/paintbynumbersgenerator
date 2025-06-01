@@ -1,7 +1,10 @@
 .status {
-    background-color: white;
-    padding: 10px;
+    background-color: #f9f9f9; /* Slightly off-white for definition */
+    padding: 15px; /* More padding */
     overflow: hidden;
+    border: 1px solid #eee; /* Subtle border */
+    border-radius: 4px; /* Slightly rounded corners */
+    margin-bottom: 10px; /* Spacing between status items if they wrap */
 }
 
 .status.active {
@@ -28,29 +31,30 @@
 
 .palette .color {
     float: left;
-    width: 40px;
-    height: 40px;
+    width: 45px; /* Slightly larger */
+    height: 45px; /* Slightly larger */
     border: 1px solid #AAA;
     border-radius: 5px;
     text-align: center;
-    padding: 5px;
     font-weight: 600;
     margin: 5px;
     text-shadow: #FFF 0px 0px 5px;
+    display: flex; /* For centering content */
+    align-items: center; /* For centering content */
+    justify-content: center; /* For centering content */
+    font-size: 14px; /* Adjust as needed */
+    cursor: default; /* It's not interactive beyond tooltip */
 }
 
 .collection-item > .row {
     margin-bottom:0px;
 }
 
-#input-pane {
+#input-pane, #svgContainer { /* Combined */
     overflow: auto;
     max-width: 100%;
-    max-height: 500px;
-}
-
-#svgContainer {
-    overflow: auto;
-    max-width: 100%;
-    max-height: 500px;
+    max-height: 60vh; /* Use viewport height */
+    border: 1px solid #ddd; /* Add a subtle border to define the area */
+    padding: 10px; /* Add some internal padding */
+    margin-bottom: 15px; /* Space below these containers */
 }
